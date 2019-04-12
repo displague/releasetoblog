@@ -4,15 +4,17 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
-	"github.com/lunny/html2md"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
 	"unicode"
+
+	"github.com/lunny/html2md"
 )
 
 type Date time.Time
@@ -118,7 +120,13 @@ func main() {
 		log.Fatal("Second argument is not a directory.")
 	}
 
-	b, err := ioutil.ReadFile(args[0])
+	resp, err := http.Get("https://github.com/" + args[0] + "/releases.atom")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+
 	if err != nil {
 		log.Fatal(err)
 	}
