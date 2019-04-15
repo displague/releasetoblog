@@ -66,11 +66,11 @@ type Link struct {
 type Links []Link
 
 var templ = `---
-title: "{{ .Title }}: {{ .Updated | ymd }}"
+title: "{{ .Repo }}: {{ .Title }}"
 date: {{ .Updated }}
 description: "{{ .Description }}"
 changelog:
-- {{ .Repo }}
+- Tools
 version: "{{ .Title }}"
 author:
   name: "{{ .Author.Name }}"
@@ -92,13 +92,16 @@ func yearMonthDate(date Date) string {
 func main() {
 	log.SetFlags(0)
 
+	convert := flag.Bool("convert", false, "convert release html back to markdown")
+	force := flag.Bool("force", false, "overwrite existing files")
 	extra := flag.String("extra", "", "additional metadata to set in frontmatter")
+
 	flag.Parse()
 
 	args := flag.Args()
 
 	if len(args) != 2 {
-		log.Printf("Usage: %s [options] <xmlfile> <targetdir>", os.Args[0])
+		log.Printf("Usage: %s [options] <org/repo> <targetdir>", os.Args[0])
 		log.Println("options:")
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -152,9 +155,13 @@ func main() {
 		if extra != nil {
 			entry.Extra = *extra
 		}
-		entry.Content = html2md.Convert(entry.Content)
 
-		if err := writeEntry(entry, dir); err != nil {
+		if *convert {
+			entry.Content = html2md.Convert(entry.Content)
+		}
+
+		// TODO count skips and writes separately
+		if err := writeEntry(entry, dir, *force); err != nil {
 			log.Fatalf("Failed writing post %q to disk:\n%s", entry.Title, err)
 		}
 		count++
@@ -163,8 +170,12 @@ func main() {
 	log.Printf("Wrote %d drafts to disk.", drafts)
 }
 
-func writeEntry(e Entry, dir string) error {
+func writeEntry(e Entry, dir string, overwrite bool) error {
 	filename := filepath.Join(dir, makePath(e.Title)+".md")
+	if _, err := os.Stat(filename); err == nil && !overwrite {
+		return nil
+	}
+
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
